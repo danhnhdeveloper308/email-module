@@ -41,7 +41,14 @@ export class EmailTemplateService {
       }
 
       await this.templateRepository.update(id, updates);
-      return await this.templateRepository.findOne({where: {id}});
+      
+      const updatedTemplate = await this.templateRepository.findOne({where: {id}});
+      
+      if (!updatedTemplate) {
+        throw new Error(`Template with ID ${id} not found`);
+      }
+      
+      return updatedTemplate;
     } catch (error) {
       this.logger.error(`Failed to update template: ${error.message}`);
       throw error;

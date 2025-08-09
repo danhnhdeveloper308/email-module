@@ -1,49 +1,50 @@
-import {Module, DynamicModule, Provider, Global} from '@nestjs/common';
-import {TypeOrmModule} from '@nestjs/typeorm';
-import {BullModule} from '@nestjs/bullmq';
-import {ConfigModule, ConfigService} from '@nestjs/config';
+import { Module, DynamicModule, Provider, Global } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 
-// Services
-import {EmailService} from './services/email.service';
+// Core Services
+import { EmailService } from './services/email.service';
+import { EmailTemplateService } from './services/email-template.service';
+import { EmailTrackingService } from './services/email-tracking.service';
+import { EmailStatsService } from './services/email-stats.service';
 
-// Controllers
-import {EmailController} from './controllers/email.controller';
-import {OAuth2Controller} from './controllers/oauth2.controller';
+// Queue Services - ✅ Only keep QueueService and MemoryQueueService as fallback
+import { QueueService } from './services/queue.service';
+import { MemoryQueueService } from './services/memory-queue.service';
+
+// Controllers (for standalone mode)
+import { EmailController } from './controllers/email.controller';
+import { EmailTemplateController } from './controllers/email-template.controller';
+import { EmailDashboardController } from './controllers/email-dashboard.controller';
+import { OAuth2Controller } from './controllers/oauth2.controller';
 
 // Processors
-import {EmailProcessor} from './processors/email.processor';
+import { EmailProcessor } from './processors/email.processor';
 
 // Entities
-import {EmailLog} from './entities/email-log.entity';
-import {EmailTemplate} from './entities/email-template.entity';
-import {EmailEvent} from './entities/email-event.entity';
+import { EmailLog } from './entities/email-log.entity';
+import { EmailTemplate } from './entities/email-template.entity';
+import { EmailEvent } from './entities/email-event.entity';
+import { EmailStats } from './entities/email-stats.entity';
+import { OAuthCredential } from './entities/oauth-credential.entity';
 
 // Interfaces
 import {
   EmailModuleOptions,
   EmailModuleAsyncOptions,
+  EmailModuleOptionsFactory,
 } from './interfaces/email-module-options.interface';
 
 // Constants
-import {
-  EMAIL_SERVICE_TOKEN,
-  EMAIL_TRACKING_SERVICE_TOKEN,
-  EMAIL_MODULE_OPTIONS_TOKEN,
-  EMAIL_TEMPLATE_SERVICE_TOKEN,
-  EMAIL_STATS_SERVICE_TOKEN,
-} from './constants';
-import {EmailTrackingService} from './services/email-tracking.service';
-import {OAuth2Service} from './services/oauth2.service';
-import {EmailTemplateService} from './services/email-template.service';
-import {EmailStatsService} from './services/email-stats.service';
-import {EmailStats} from './entities/email-stats.entity';
-import {OAuthCredential} from './entities/oauth-credential.entity';
-import {EmailTemplateController} from './controllers/email-template.controller';
-import {EmailDashboardController} from './controllers/email-dashboard.controller';
+import { EMAIL_MODULE_OPTIONS_TOKEN, EMAIL_SERVICE_TOKEN, EMAIL_STATS_SERVICE_TOKEN, EMAIL_TEMPLATE_SERVICE_TOKEN, EMAIL_TRACKING_SERVICE_TOKEN } from './constants';
+import { OAuth2Service } from './services/oauth2.service';
 
 @Global()
 @Module({})
 export class EmailModule {
+  /**
+   * Configure EmailModule with static options
+   */
   static forRoot(options: EmailModuleOptions): DynamicModule {
     const optionsProvider: Provider = {
       provide: EMAIL_MODULE_OPTIONS_TOKEN,
@@ -61,63 +62,62 @@ export class EmailModule {
           EmailStats,
           OAuthCredential,
         ]),
-        BullModule.registerQueue({
-          name: 'email',
-          defaultJobOptions: {
-            attempts: 3,
-            backoff: {
-              type: 'exponential',
-              delay: 5000,
-            },
-            removeOnComplete: true,
-            removeOnFail: false,
-          },
-        }),
       ],
-      controllers: [
+      controllers: options.includeControllers ? [
         EmailController,
         EmailTemplateController,
         EmailDashboardController,
         OAuth2Controller,
-      ],
+      ] : [],
       providers: [
         optionsProvider,
-        {
-          provide: EMAIL_SERVICE_TOKEN,
-          useClass: EmailService,
-        },
-        {
-          provide: EMAIL_TRACKING_SERVICE_TOKEN,
-          useClass: EmailTrackingService,
-        },
-        {
-          provide: EMAIL_TEMPLATE_SERVICE_TOKEN,
-          useClass: EmailTemplateService,
-        },
-        {
-          provide: EMAIL_STATS_SERVICE_TOKEN,
-          useClass: EmailStatsService,
-        },
+        // ✅ Simplified queue services - only QueueService and MemoryQueue fallback
+        QueueService,
+        MemoryQueueService,
+        // Core Services
         EmailService,
-        EmailTrackingService,
         EmailTemplateService,
+        EmailTrackingService,
         EmailStatsService,
         OAuth2Service,
         EmailProcessor,
+        // Token providers for controllers
+        {
+          provide: EMAIL_SERVICE_TOKEN,
+          useExisting: EmailService,
+        },
+        {
+          provide: EMAIL_TEMPLATE_SERVICE_TOKEN,
+          useExisting: EmailTemplateService,
+        },
+        {
+          provide: EMAIL_TRACKING_SERVICE_TOKEN,
+          useExisting: EmailTrackingService,
+        },
+        {
+          provide: EMAIL_STATS_SERVICE_TOKEN,
+          useExisting: EmailStatsService,
+        },
       ],
       exports: [
-        EMAIL_SERVICE_TOKEN,
-        EMAIL_TRACKING_SERVICE_TOKEN,
-        EMAIL_TEMPLATE_SERVICE_TOKEN,
-        EMAIL_STATS_SERVICE_TOKEN,
         EmailService,
-        EmailTrackingService,
         EmailTemplateService,
+        EmailTrackingService,
+        EmailStatsService,
+        QueueService,
         OAuth2Service,
+        // Export tokens as well
+        EMAIL_SERVICE_TOKEN,
+        EMAIL_TEMPLATE_SERVICE_TOKEN,
+        EMAIL_TRACKING_SERVICE_TOKEN,
+        EMAIL_STATS_SERVICE_TOKEN,
       ],
     };
   }
 
+  /**
+   * Configure EmailModule with async options
+   */
   static forRootAsync(options: EmailModuleAsyncOptions): DynamicModule {
     const asyncProviders = this.createAsyncProviders(options);
 
@@ -132,26 +132,6 @@ export class EmailModule {
           EmailStats,
           OAuthCredential,
         ]),
-        BullModule.registerQueueAsync({
-          name: 'email',
-          useFactory: (configService: ConfigService) => ({
-            connection: {
-              host: configService.get('REDIS_HOST', 'localhost'),
-              port: configService.get('REDIS_PORT', 6379),
-              password: configService.get('REDIS_PASSWORD'),
-            },
-            defaultJobOptions: {
-              attempts: 3,
-              backoff: {
-                type: 'exponential',
-                delay: 5000,
-              },
-              removeOnComplete: true,
-              removeOnFail: false,
-            },
-          }),
-          inject: [ConfigService],
-        }),
         ...(options.imports || []),
       ],
       controllers: [
@@ -162,45 +142,51 @@ export class EmailModule {
       ],
       providers: [
         ...asyncProviders,
-        {
-          provide: EMAIL_SERVICE_TOKEN,
-          useClass: EmailService,
-        },
-        {
-          provide: EMAIL_TRACKING_SERVICE_TOKEN,
-          useClass: EmailTrackingService,
-        },
-        {
-          provide: EMAIL_TEMPLATE_SERVICE_TOKEN,
-          useClass: EmailTemplateService,
-        },
-        {
-          provide: EMAIL_STATS_SERVICE_TOKEN,
-          useClass: EmailStatsService,
-        },
+        // ✅ Simplified queue services
+        QueueService,
+        MemoryQueueService,
+        // Core Services
         EmailService,
-        EmailTrackingService,
         EmailTemplateService,
+        EmailTrackingService,
         EmailStatsService,
         OAuth2Service,
         EmailProcessor,
+        // Token providers for controllers
+        {
+          provide: EMAIL_SERVICE_TOKEN,
+          useExisting: EmailService,
+        },
+        {
+          provide: EMAIL_TEMPLATE_SERVICE_TOKEN,
+          useExisting: EmailTemplateService,
+        },
+        {
+          provide: EMAIL_TRACKING_SERVICE_TOKEN,
+          useExisting: EmailTrackingService,
+        },
+        {
+          provide: EMAIL_STATS_SERVICE_TOKEN,
+          useExisting: EmailStatsService,
+        },
       ],
       exports: [
-        EMAIL_SERVICE_TOKEN,
-        EMAIL_TRACKING_SERVICE_TOKEN,
-        EMAIL_TEMPLATE_SERVICE_TOKEN,
-        EMAIL_STATS_SERVICE_TOKEN,
         EmailService,
-        EmailTrackingService,
         EmailTemplateService,
+        EmailTrackingService,
+        EmailStatsService,
+        QueueService,
         OAuth2Service,
+        // Export tokens as well
+        EMAIL_SERVICE_TOKEN,
+        EMAIL_TEMPLATE_SERVICE_TOKEN,
+        EMAIL_TRACKING_SERVICE_TOKEN,
+        EMAIL_STATS_SERVICE_TOKEN,
       ],
     };
   }
 
-  private static createAsyncProviders(
-    options: EmailModuleAsyncOptions,
-  ): Provider[] {
+  private static createAsyncProviders(options: EmailModuleAsyncOptions): Provider[] {
     if (options.useExisting || options.useFactory) {
       return [this.createAsyncOptionsProvider(options)];
     }
@@ -214,9 +200,7 @@ export class EmailModule {
     ];
   }
 
-  private static createAsyncOptionsProvider(
-    options: EmailModuleAsyncOptions,
-  ): Provider {
+  private static createAsyncOptionsProvider(options: EmailModuleAsyncOptions): Provider {
     if (options.useFactory) {
       return {
         provide: EMAIL_MODULE_OPTIONS_TOKEN,
@@ -227,7 +211,7 @@ export class EmailModule {
 
     return {
       provide: EMAIL_MODULE_OPTIONS_TOKEN,
-      useFactory: async (optionsFactory: any) =>
+      useFactory: async (optionsFactory: EmailModuleOptionsFactory) =>
         await optionsFactory.createEmailModuleOptions(),
       inject: [options.useExisting || options.useClass!],
     };

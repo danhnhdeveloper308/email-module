@@ -1,8 +1,6 @@
 import {Injectable, Logger, Inject} from '@nestjs/common';
 import {InjectRepository} from '@nestjs/typeorm';
 import {Repository} from 'typeorm';
-import {InjectQueue} from '@nestjs/bullmq';
-import {Queue} from 'bullmq';
 import {ConfigService} from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import * as Handlebars from 'handlebars';
@@ -23,6 +21,7 @@ import {EmailModuleOptions} from '../interfaces/email-module-options.interface';
 // Constants
 import {EMAIL_MODULE_OPTIONS_TOKEN} from '../constants';
 import {OAuth2Service} from './oauth2.service';
+import { QueueService } from './queue.service';
 
 // Services
 
@@ -37,8 +36,7 @@ export class EmailService implements IEmailService {
     private emailLogRepository: Repository<EmailLog>,
     @InjectRepository(EmailTemplate)
     private emailTemplateRepository: Repository<EmailTemplate>,
-    @InjectQueue('email')
-    private emailQueue: Queue,
+    private queueService: QueueService, // ✅ Sử dụng QueueService thay vì QueueAdapterService
     private configService: ConfigService,
     private oauth2Service: OAuth2Service,
     @Inject(EMAIL_MODULE_OPTIONS_TOKEN)
@@ -164,9 +162,12 @@ export class EmailService implements IEmailService {
       });
 
       await this.emailLogRepository.save(emailLog);
+      this.logger.log(`📝 Email log created: ${emailId}`);
 
-      // Add to queue
-      await this.emailQueue.add(
+      // ✅ Add debug logs
+      this.logger.log(`📦 Adding job to queue: ${emailId}`);
+      
+      const jobResult = await this.queueService.add(
         'send-email',
         {
           emailId,
@@ -181,14 +182,16 @@ export class EmailService implements IEmailService {
         },
         {
           attempts: 3,
-          backoff: {type: 'exponential', delay: 5000},
+          backoff: { type: 'exponential', delay: 5000 },
           delay: options.deliveryTime
             ? new Date(options.deliveryTime).getTime() - Date.now()
             : 0,
         },
       );
-
-      this.logger.log(`Email queued: ${emailId}`);
+      
+      // this.logger.log(`✅ Job added to queue with result:`, JSON.stringify(jobResult, null, 2));
+      this.logger.log(`📧 Email queued: ${emailId}`);
+      
       return emailId;
     } catch (error) {
       this.logger.error(`Failed to queue email: ${error.message}`);
@@ -441,23 +444,25 @@ export class EmailService implements IEmailService {
     return savedTemplate;
   }
 
-  // Process queued email (called by processor)
+  // Process queued email (called by EmailProcessor)
   async processQueuedEmail(data: any): Promise<void> {
     const {emailId, to, subject, template, context, options} = data;
 
     try {
-      // Update status
+      this.logger.log(`📧 Processing queued email ${emailId} for ${Array.isArray(to) ? to.join(', ') : to}`);
+      
+      // Update status to processing
       await this.emailLogRepository.update(
         {emailId},
         {status: EmailStatus.PROCESSING, attempts: () => '"attempts" + 1'},
       );
 
-      // Compile template
-      const html = await this.compileTemplate(template, context);
+      // Compile template with emailId in context
+      const html = await this.compileTemplate(template, {...context, emailId});
 
       // Send email
       const result = await this.transporter.sendMail({
-        from: options.from,
+        from: options.from || this.options.defaults?.from,
         to,
         subject,
         html,
@@ -473,7 +478,7 @@ export class EmailService implements IEmailService {
         },
       );
 
-      this.logger.log(`Email sent: ${emailId}`);
+      this.logger.log(`✅ Email sent successfully: ${emailId} to ${Array.isArray(to) ? to.join(', ') : to}`);
     } catch (error) {
       // Update failure
       await this.emailLogRepository.update(
@@ -481,6 +486,7 @@ export class EmailService implements IEmailService {
         {status: EmailStatus.FAILED, error: error.message},
       );
 
+      this.logger.error(`❌ Failed to send email ${emailId}: ${error.message}`);
       throw error;
     }
   }
@@ -489,26 +495,47 @@ export class EmailService implements IEmailService {
     templateName: string,
     context: Record<string, any>,
   ): Promise<string> {
+    this.logger.debug(`🔧 Compiling template: ${templateName}`);
+    
+    // Check cache first
     if (!this.templateCache.has(templateName)) {
       const templateEntity = await this.emailTemplateRepository.findOne({
         where: {name: templateName, isActive: true},
       });
 
       if (!templateEntity) {
-        throw new Error(`Template "${templateName}" not found`);
+        throw new Error(`Template "${templateName}" not found or inactive`);
       }
 
-      this.templateCache.set(
-        templateName,
-        Handlebars.compile(templateEntity.content),
-      );
+      this.logger.debug(`📄 Template found: ${templateName}, caching...`);
+      
+      // Compile and cache template
+      const compiled = Handlebars.compile(templateEntity.content);
+      this.templateCache.set(templateName, compiled);
     }
 
     const template = this.templateCache.get(templateName);
-    return template({
+    
+    // ✅ Add null check for template
+    if (!template) {
+      throw new Error(`Failed to retrieve compiled template "${templateName}"`);
+    }
+    
+    // Add default context variables
+    const enrichedContext = {
       ...context,
-      appName: this.options.defaults?.appName,
+      appName: context.appName || this.options.defaults?.appName || 'My App',
+      appUrl: context.appUrl || this.options.defaults?.appUrl || 'http://localhost:3000',
       currentYear: new Date().getFullYear(),
-    });
+      supportEmail: 'support@example.com',
+      dashboardUrl: `${this.options.defaults?.appUrl}/dashboard`,
+    };
+
+    this.logger.debug(`🎨 Rendering template with context: ${Object.keys(enrichedContext).join(', ')}`);
+    
+    const html = template(enrichedContext);
+    this.logger.debug(`✅ Template compiled successfully, HTML length: ${html.length}`);
+    
+    return html;
   }
 }

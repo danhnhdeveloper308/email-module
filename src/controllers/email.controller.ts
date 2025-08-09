@@ -10,8 +10,7 @@ import {
 } from '@nestjs/common';
 import {Response} from 'express';
 import {ApiTags, ApiOperation, ApiResponse} from '@nestjs/swagger';
-import {InjectQueue} from '@nestjs/bullmq';
-import {Queue} from 'bullmq';
+import {QueueService} from '../services/queue.service';
 import {EmailService} from '../services/email.service';
 import {EmailTrackingService} from '../services/email-tracking.service';
 import {SendEmailDto} from '../dto/send-email.dto';
@@ -22,7 +21,7 @@ export class EmailController {
   constructor(
     private emailService: EmailService,
     private trackingService: EmailTrackingService,
-    @InjectQueue('email') private emailQueue: Queue,
+    private queueService: QueueService, // ✅ Use QueueService
   ) {}
 
   @ApiOperation({summary: 'Health check endpoint'})
@@ -202,32 +201,40 @@ export class EmailController {
   @Get('queue/details')
   async getDetailedQueueStatus() {
     try {
-      // Get real queue stats from BullMQ
-      const queueStats = {
-        waiting: await this.emailQueue.getWaiting(),
-        active: await this.emailQueue.getActive(),
-        completed: await this.emailQueue.getCompleted(),
-        failed: await this.emailQueue.getFailed(),
-        delayed: await this.emailQueue.getDelayed(),
-      };
+      const queueStats = await this.queueService.getQueueStatus();
 
       return {
         success: true,
-        stats: {
-          waiting: queueStats.waiting.length,
-          active: queueStats.active.length,
-          completed: queueStats.completed.length,
-          failed: queueStats.failed.length,
-          delayed: queueStats.delayed.length,
-        },
-        jobs: {
-          recent_failed: queueStats.failed.slice(0, 10).map(job => ({
-            id: job.id,
-            data: job.data,
-            error: job.failedReason,
-            timestamp: job.timestamp,
-          })),
-        },
+        stats: queueStats,
+        queueType: queueStats.type,
+        // ✅ Include recovery information
+        recovery: queueStats.recovery,
+        message:
+          queueStats.type === 'memory'
+            ? 'Using memory queue - jobs will be recovered when Redis is back'
+            : 'Using Redis queue - all systems operational',
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  // ✅ New endpoint to get recovery information
+  @ApiOperation({summary: 'Get Redis recovery status'})
+  @Get('queue/recovery')
+  async getRecoveryStatus() {
+    try {
+      const recoveryInfo = this.queueService.getRecoveryInfo();
+
+      return {
+        success: true,
+        recovery: recoveryInfo,
+        message: recoveryInfo.isRedisAvailable
+          ? 'Redis is operational'
+          : `Recovery monitoring active - attempt ${recoveryInfo.recoveryAttempts}/10`,
       };
     } catch (error) {
       return {

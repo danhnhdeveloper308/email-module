@@ -1,71 +1,67 @@
-import {NestFactory} from '@nestjs/core';
-import {ValidationPipe, Logger} from '@nestjs/common';
-import {DocumentBuilder, SwaggerModule} from '@nestjs/swagger';
-import {Module} from '@nestjs/common';
-import {ConfigModule} from '@nestjs/config';
-import {TypeOrmModule} from '@nestjs/typeorm';
-import {BullModule} from '@nestjs/bullmq';
+import { NestFactory } from '@nestjs/core';
+import { ValidationPipe, Logger } from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
-// Import the EmailModule
-import {EmailModule} from './email.module';
+import { EmailModule } from './index';
+import { EmailConfigBuilder } from './interfaces/email-module-options.interface'; // ✅ Correct import path
 
-// Create a standalone app module for testing
+// Standalone application module for testing
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-    }),
-    // Add TypeORM configuration for standalone mode
+    ConfigModule.forRoot({ isGlobal: true }),
+
+    // Database configuration
     TypeOrmModule.forRoot({
       type: 'postgres',
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '5433'),
-      username: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASSWORD || 'postgres',
-      database: process.env.DB_NAME || 'email_service',
-      entities: [__dirname + '/**/*.entity{.ts,.js}'],
-      synchronize: true, // This will create tables automatically
-      logging: ['error', 'warn', 'migration'],
+      url: process.env.DATABASE_URL,
       autoLoadEntities: true,
-      dropSchema: false, // Don't drop existing schema
+      synchronize: process.env.NODE_ENV !== 'production',
+      logging: ['error', 'warn'],
     }),
-    // Add BullMQ with updated configuration
-    BullModule.forRoot({
-      connection: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6380'),
+
+    // EmailModule with simplified configuration
+    EmailModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => {
+        return EmailConfigBuilder.create()
+          .smtp({
+            host: configService.get('SMTP_HOST', 'smtp.gmail.com'),
+            port: parseInt(configService.get('SMTP_PORT', '587')),
+            secure: configService.get('SMTP_SECURE') === 'true',
+            user: configService.get('SMTP_USER', ''),
+            pass: configService.get('SMTP_PASS', ''),
+          })
+          .upstash(
+            configService.get('REDIS_URL') ||
+              configService.get('UPSTASH_REDIS_URL', ''),
+          )
+          .defaults(
+            configService.get('DEFAULT_FROM_EMAIL', 'noreply@example.com'),
+            configService.get('APP_NAME', 'DNSecure Email Module'),
+            configService.get('APP_URL', 'http://localhost:3000'),
+          )
+          .withApi() // Include REST API controllers
+          .build();
       },
-    }),
-    // Import EmailModule with real SMTP configuration
-    EmailModule.forRoot({
-      defaults: {
-        from: process.env.DEFAULT_FROM_EMAIL || 'hoangdanh54317@gmail.com',
-        appName: process.env.APP_NAME || 'Email Module Test',
-        appUrl: process.env.APP_URL || 'http://localhost:3000',
-      },
-      smtp: {
-        host: process.env.SMTP_HOST || 'smtp.gmail.com',
-        port: parseInt(process.env.SMTP_PORT || '587'),
-        secure: process.env.SMTP_SECURE === 'true',
-        user: process.env.SMTP_USER || 'hoangdanh54317@gmail.com',
-        pass: process.env.SMTP_PASS || 'etbzdyzfbjgyywps',
-      },
+      inject: [ConfigService],
     }),
   ],
 })
 class StandaloneEmailApp {}
 
 async function bootstrap() {
-  const logger = new Logger('Bootstrap');
+  const logger = new Logger('EmailModule');
 
   try {
-    // Create the standalone app
     const app = await NestFactory.create(StandaloneEmailApp);
 
-    // Enable CORS for development
+    // Enable CORS
     app.enableCors();
 
-    // Enable validation
+    // Global validation pipe
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -74,33 +70,44 @@ async function bootstrap() {
       }),
     );
 
-    // Setup Swagger
+    // Swagger API documentation
     const config = new DocumentBuilder()
-      .setTitle('DN Secure Email Module')
+      .setTitle('DNSecure Email Module')
       .setDescription(
-        'Email service module with templates, tracking, and queue management',
+        'Professional email service with templates, tracking & queue management',
       )
-      .setVersion('1.0')
+      .setVersion('1.1.0')
       .addTag('email', 'Email operations')
-      .addTag('email-templates', 'Email template management')
-      .addTag('email-dashboard', 'Email tracking and analytics')
+      .addTag('templates', 'Template management')
+      .addTag('dashboard', 'Analytics & tracking')
       .addServer('http://localhost:3000', 'Development server')
       .build();
 
     const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('api', app, document);
+    SwaggerModule.setup('api', app, document, {
+      customSiteTitle: 'DNSecure Email API',
+      customfavIcon: '/favicon.ico',
+      customJs: [
+        'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui-bundle.min.js',
+      ],
+    });
 
     const port = process.env.PORT || 3000;
     await app.listen(port);
 
-    logger.log(`🚀 Email Module running on: http://localhost:${port}`);
-    logger.log(`📚 Swagger documentation: http://localhost:${port}/api`);
-    logger.log(`🎯 Health check: http://localhost:${port}/email/health`);
-    logger.log(`💡 To seed templates, run: npm run templates:sync`);
+    logger.log(`🚀 DNSecure Email Module running on: http://localhost:${port}`);
+    logger.log(`📚 API Documentation: http://localhost:${port}/api`);
+    logger.log(`💚 Health Check: http://localhost:${port}/email/health`);
+    logger.log(
+      `📧 Send Test Email: POST http://localhost:${port}/email/test`,
+    );
   } catch (error) {
-    logger.error(`Failed to start application: ${error.message}`, error.stack);
+    logger.error(`❌ Failed to start application: ${error.message}`);
     process.exit(1);
   }
 }
 
-bootstrap();
+// Run standalone app
+if (require.main === module) {
+  bootstrap();
+}

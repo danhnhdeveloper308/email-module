@@ -1,24 +1,28 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "outDir": "./dist",
     "declaration": true,
     "declarationMap": true,
-    "outDir": "./dist",
-    "removeComments": true,
+    "sourceMap": true,
+    "removeComments": false,
     "emitDecoratorMetadata": true,
-    "experimentalDecorators": true
+    "experimentalDecorators": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "noImplicitAny": true
   },
   "include": [
     "src/**/*"
   ],
   "exclude": [
-    "node_modules", 
-    "dist", 
-    "test", 
-    "**/*spec.ts", 
+    "node_modules",
+    "dist",
+    "test",
+    "**/*spec.ts",
     "**/*test.ts",
     "src/main.ts",
-    "src/database/seeds/**/*",
-    "src/database/migrations/**/*"
+    "src/database/migrations",
+    "src/database/seeds"
   ]
 }

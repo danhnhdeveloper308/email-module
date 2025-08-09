@@ -6,13 +6,11 @@ import {
   Delete,
   Body,
   Param,
-  Inject,
 } from '@nestjs/common';
 import {ApiTags, ApiOperation, ApiBody} from '@nestjs/swagger';
 import {EmailTemplateService} from '../services/email-template.service';
 import {CreateTemplateDto} from '../dto/create-template.dto';
 import {UpdateTemplateDto} from '../dto/update-template.dto';
-import {EMAIL_TEMPLATE_SERVICE_TOKEN} from '../constants';
 import * as Handlebars from 'handlebars';
 
 class PreviewTemplateDto {
@@ -24,7 +22,7 @@ class PreviewTemplateDto {
 @Controller('email-templates')
 export class EmailTemplateController {
   constructor(
-    @Inject(EMAIL_TEMPLATE_SERVICE_TOKEN)
+    // ✅ Direct injection without token
     private templateService: EmailTemplateService,
   ) {}
 
