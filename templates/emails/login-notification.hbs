@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>{{appName}} - New Login Detected</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0;">
+  {{> header}}
+  <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+    <h2>New Login Detected</h2>
+    <p>Hello {{name}},</p>
+    <p>We detected a new login to your {{appName}} account. Here are the details:</p>
+    
+    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+      <p><strong>Time:</strong> {{loginInfo.time}}</p>
+      <p><strong>Device:</strong> {{loginInfo.device}}</p>
+      <p><strong>Location:</strong> {{loginInfo.location}}</p>
+      <p><strong>IP Address:</strong> {{loginInfo.ipAddress}}</p>
+      {{#if loginInfo.isNewDevice}}
+      <p style="color: #e74c3c;"><strong>⚠️ This is a new device</strong></p>
+      {{/if}}
+    </div>
+    
+    <p>If this was you, you can ignore this email. If you don't recognize this activity, please secure your account immediately by changing your password.</p>
+    
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="{{securitySettingsUrl}}" style="background-color: #dc3545; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">Secure My Account</a>
+    </div>
+    
+    <p>Thanks,<br>The {{appName}} Team</p>
+  </div>
+  {{> footer recipient=to}}
+  
+  <!-- Tracking pixel for email opens -->
+  <img src="{{appUrl}}/api/email/track/{{emailId}}/open" alt="" width="1" height="1" style="display:none;">
+</body>
+</html>

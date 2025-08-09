@@ -1,0 +1,47 @@
+{
+  "welcome": {
+    "subject": "Welcome to {{appName}}!",
+    "description": "Welcome email for new users",
+    "category": "onboarding"
+  },
+  "verification": {
+    "subject": "Verify your email address",
+    "description": "Email verification template",
+    "category": "authentication"
+  },
+  "verification-code": {
+    "subject": "Your verification code",
+    "description": "Email with verification code",
+    "category": "authentication"
+  },
+  "password-reset": {
+    "subject": "Reset your password",
+    "description": "Password reset template",
+    "category": "authentication"
+  },
+  "login-notification": {
+    "subject": "New login detected",
+    "description": "Login notification template",
+    "category": "security"
+  },
+  "2fa-backup-codes": {
+    "subject": "Your 2FA backup codes",
+    "description": "2FA backup codes template",
+    "category": "security"
+  },
+  "magic-link": {
+    "subject": "Sign in with magic link",
+    "description": "Magic link authentication",
+    "category": "authentication"
+  },
+  "login-attempt": {
+    "subject": "Login attempt notification",
+    "description": "Failed login attempt notification",
+    "category": "security"
+  },
+  "account-activation": {
+    "subject": "Activate your account",
+    "description": "Account activation template",
+    "category": "onboarding"
+  }
+}

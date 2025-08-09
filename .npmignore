@@ -1,0 +1,60 @@
+# Source files
+src/
+test/
+tests/
+__tests__/
+
+# Development files
+.env*
+docker-compose.yml
+docker-compose.*.yml
+Dockerfile*
+
+# Build files
+tsconfig.json
+tsconfig.*.json
+nest-cli.json
+.eslintrc.js
+.prettierrc
+.gitignore
+
+# Development dependencies
+node_modules/
+coverage/
+.nyc_output/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Database
+*.sqlite
+*.db
+
+# Keep important files
+!dist/
+!templates/
+!README.md
+!ARCHITECTURE.md
+!USAGE_GUIDE.md
+!API_DOCUMENTATION.md
+!LICENSE
+!CHANGELOG.md

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Account Activation | {{appName}}</title>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; background-color: #ffffff; }
+    .header { text-align: center; padding: 20px 0; border-bottom: 2px solid #2196F3; }
+    .content { padding: 30px 0; }
+    .button { display: inline-block; background-color: #2196F3; color: white !important; text-decoration: none; padding: 15px 30px; border-radius: 5px; font-weight: bold; margin: 20px 0; }
+    .footer { text-align: center; color: #666; font-size: 12px; padding: 20px 0; border-top: 1px solid #eee; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 style="color: #2196F3; margin: 0;">Activate Your Account</h1>
+    </div>
+    <div class="content">
+      <h2>Hello {{name}},</h2>
+      <p>Your account has been successfully created! To start using {{appName}}, please activate your account by clicking the button below:</p>
+      
+      <div style="text-align: center;">
+        <a href="{{activationLink}}" class="button">Activate Account</a>
+      </div>
+      
+      <p>This activation link will expire in 48 hours. If you don't activate within this time, you'll need to request a new activation email.</p>
+      
+      <p><strong>What happens after activation?</strong></p>
+      <ul>
+        <li>Full access to all {{appName}} features</li>
+        <li>Ability to customize your profile</li>
+        <li>Access to premium features</li>
+        <li>Priority customer support</li>
+      </ul>
+      
+      <p>Best regards,<br>The {{appName}} Team</p>
+    </div>
+    <div class="footer">
+      <p>© {{currentYear}} {{appName}}. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>

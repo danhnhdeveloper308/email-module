@@ -1,0 +1,10 @@
+<footer style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e9ecef; text-align: center; color: #6c757d; font-size: 0.9em;">
+  <p>© {{currentYear}} {{appName}}. All rights reserved.</p>
+  {{#if recipient}}
+  <p>This email was sent to {{recipient}}.</p>
+  {{/if}}
+  <p>If you have any questions, please contact us at {{supportEmail}}.</p>
+  {{#if unsubscribeUrl}}
+  <p><a href="{{unsubscribeUrl}}" style="color: #6c757d;">Unsubscribe</a></p>
+  {{/if}}
+</footer>
